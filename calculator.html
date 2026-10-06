@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Calculator</title>
+<style>
+:root{--bg:#e3e8dc;--body:#cfd8c4;--screen:#2b3a34;--screen-text:#d8f0c8;--key:#f4f6ef;--key-text:#22302a;--op:#3f6b5a;--op-text:#fff;--clear:#c4543a;--shadow:#9aa88f;--hint:#55655c;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#161c19;--body:#222b27;--screen:#0f1512;--screen-text:#b9e8a4;--key:#33403a;--key-text:#e8efe6;--op:#4f8a74;--op-text:#fff;--clear:#d2664b;--shadow:#0b0f0d;--hint:#9fb0a6}}
+:root[data-theme="dark"]{--bg:#161c19;--body:#222b27;--screen:#0f1512;--screen-text:#b9e8a4;--key:#33403a;--key-text:#e8efe6;--op:#4f8a74;--op-text:#fff;--clear:#d2664b;--shadow:#0b0f0d;--hint:#9fb0a6}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);display:flex;align-items:center;justify-content:center;font-family:"Trebuchet MS","Segoe UI",system-ui,sans-serif;color:var(--key-text)}
+main{width:min(340px,92vw)}
+.calc{background:var(--body);border-radius:22px;padding:18px;box-shadow:0 10px 0 var(--shadow)}
+.screen{background:var(--screen);color:var(--screen-text);border-radius:12px;padding:12px 16px;text-align:right;min-height:96px;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden}
+.expr{font-size:.95rem;opacity:.65;min-height:1.3em;word-break:break-all}
+.out{font-family:"Courier New",monospace;font-size:2.4rem;font-weight:700;word-break:break-all;line-height:1.15}
+.keys{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:16px}
+button{font:inherit;font-size:1.35rem;font-weight:600;border:0;border-radius:12px;padding:16px 0;cursor:pointer;background:var(--key);color:var(--key-text);box-shadow:0 4px 0 var(--shadow)}
+button:active{transform:translateY(3px);box-shadow:0 1px 0 var(--shadow)}
+button:focus-visible{outline:3px solid var(--op);outline-offset:2px}
+.op{background:var(--op);color:var(--op-text)}
+.clear{background:var(--clear);color:#fff}
+.wide{grid-column:span 2}
+.hint{text-align:center;font-size:.85rem;color:var(--hint);margin:22px 0 0}
+</style>
+</head>
+<body>
+<main>
+  <div class="calc">
+    <div class="screen" aria-live="polite">
+      <div class="expr" id="expr"></div>
+      <div class="out" id="out">0</div>
+    </div>
+    <div class="keys" id="keys">
+      <button class="clear wide" data-k="C">Clear</button>
+      <button data-k="back" aria-label="Backspace">&#9003;</button>
+      <button class="op" data-k="/">&divide;</button>
+      <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button>
+      <button class="op" data-k="*">&times;</button>
+      <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button>
+      <button class="op" data-k="-">&minus;</button>
+      <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button>
+      <button class="op" data-k="+">+</button>
+      <button class="wide" data-k="0">0</button>
+      <button data-k=".">.</button>
+      <button class="op" data-k="=">=</button>
+    </div>
+  </div>
+  <p class="hint">Keyboard works too: digits, + - * /, Enter, Backspace, Esc.</p>
+</main>
+<script>
+let cur = "0", prev = null, op = null, fresh = false;
+const out = document.getElementById("out"), expr = document.getElementById("expr");
+const sym = {"+":"+","-":"\u2212","*":"\u00d7","/":"\u00f7"};
+
+function show(){
+  out.textContent = cur;
+  expr.textContent = op ? prev + " " + sym[op] + (fresh ? "" : " " + cur) : "";
+}
+function calc(a, b, o){
+  a = parseFloat(a); b = parseFloat(b);
+  if (o === "+") return a + b;
+  if (o === "-") return a - b;
+  if (o === "*") return a * b;
+  if (o === "/") return b === 0 ? null : a / b;
+}
+function fmt(n){
+  if (n === null) return "Cannot divide by 0";
+  return String(parseFloat(n.toPrecision(12)));
+}
+function press(k){
+  if (cur === "Cannot divide by 0") { cur = "0"; prev = null; op = null; }
+  if (/^[0-9]$/.test(k)){
+    cur = (cur === "0" || fresh) ? k : cur + k; fresh = false;
+  } else if (k === "."){
+    if (fresh) { cur = "0."; fresh = false; }
+    else if (!cur.includes(".")) cur += ".";
+  } else if (k === "C"){
+    cur = "0"; prev = null; op = null; fresh = false;
+  } else if (k === "back"){
+    if (!fresh) cur = cur.length > 1 ? cur.slice(0, -1) : "0";
+  } else if ("+-*/".includes(k)){
+    if (op && !fresh){
+      cur = fmt(calc(prev, cur, op));
+      if (cur === "Cannot divide by 0") { op = null; prev = null; show(); return; }
+    }
+    prev = cur; op = k; fresh = true;
+  } else if (k === "="){
+    if (op){
+      const r = fmt(calc(prev, cur, op));
+      expr.textContent = prev + " " + sym[op] + " " + cur + " =";
+      cur = r; prev = null; op = null; fresh = true;
+      out.textContent = cur;
+      return;
+    }
+  }
+  show();
+}
+document.getElementById("keys").addEventListener("click", e => {
+  const b = e.target.closest("button");
+  if (b) press(b.dataset.k);
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Enter" && document.activeElement.tagName === "BUTTON") return;
+  if (/^[0-9.]$/.test(e.key) || "+-*/".includes(e.key)) press(e.key);
+  else if (e.key === "Enter" || e.key === "=") { e.preventDefault(); press("="); }
+  else if (e.key === "Backspace") press("back");
+  else if (e.key === "Escape") press("C");
+});
+</script>
+</body>
+</html>
